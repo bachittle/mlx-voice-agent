@@ -189,11 +189,11 @@
       <div class="option-group">
         <div class="option-label">Voice</div>
         <div class="voice-grid" id="voice-grid">
-          <button class="voice-btn active" data-voice="morgan">Morgan</button>
-          <button class="voice-btn" data-voice="scarlett">Scarlett</button>
-          <button class="voice-btn" data-voice="david">David</button>
-          <button class="voice-btn" data-voice="emma">Emma</button>
-          <button class="voice-btn" data-voice="custom">+ Clone</button>
+          <button class="voice-btn active" data-voice="morgan-freeman">Morgan</button>
+          <button class="voice-btn" data-voice="scarlett-johansson">Scarlett</button>
+          <button class="voice-btn" data-voice="david-attenborough">David</button>
+          <button class="voice-btn" data-voice="snoop-dogg">Snoop</button>
+          <button class="voice-btn" data-voice="gordon-ramsay">Gordon</button>
         </div>
       </div>
       <div class="option-group">
@@ -324,6 +324,73 @@
     const section = document.getElementById('text-input-section');
     section.classList.toggle('visible');
     if (section.classList.contains('visible')) document.getElementById('text-input').focus();
+  });
+
+  // --- Backend ---
+  const BACKEND = '';
+
+  // --- Send button ---
+  function getSelectedVoice() {
+    const active = document.querySelector('.voice-btn.active');
+    return active ? active.dataset.voice : 'morgan-freeman';
+  }
+
+  async function sendMessage() {
+    const input = document.getElementById('text-input');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    if (thinkingTimeout) { clearTimeout(thinkingTimeout); thinkingTimeout = null; }
+    if (speakingTimeout) { clearTimeout(speakingTimeout); speakingTimeout = null; }
+
+    setDemoState('listening');
+    transcriptEl.textContent = text;
+
+    thinkingTimeout = setTimeout(async () => {
+      setDemoState('thinking');
+      thinkingTimeout = null;
+      try {
+        const res = await fetch(`${BACKEND}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, voice: getSelectedVoice() })
+        });
+        const data = await res.json();
+        setDemoState('speaking');
+        transcriptEl.textContent = data.response;
+        if (data.audio) {
+          const bytes = Uint8Array.from(atob(data.audio), c => c.charCodeAt(0));
+          const blob = new Blob([bytes], { type: 'audio/wav' });
+          const url = URL.createObjectURL(blob);
+          const el = new Audio(url);
+          el.onended = () => {
+            URL.revokeObjectURL(url);
+            demoIndex = 0;
+            vizState = 'idle';
+            vizContainer.className = 'visualizer-container';
+            statusLabel.textContent = demoLabels['idle'];
+            statusLabel.style.color = '#555';
+          };
+          el.play();
+          return;
+        }
+      } catch (e) {
+        setDemoState('speaking');
+        transcriptEl.textContent = 'Error: could not reach backend';
+      }
+      speakingTimeout = setTimeout(() => {
+        demoIndex = 0;
+        vizState = 'idle';
+        vizContainer.className = 'visualizer-container';
+        statusLabel.textContent = demoLabels['idle'];
+        statusLabel.style.color = '#555';
+        speakingTimeout = null;
+      }, 2000);
+    }, 500);
+  }
+  document.getElementById('send-btn').addEventListener('click', sendMessage);
+  document.getElementById('text-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMessage();
   });
 
   // --- Voice selector ---
