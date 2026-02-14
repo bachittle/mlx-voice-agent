@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voice AI</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow-y: auto;
+    user-select: none;
+  }
+
+  .container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    width: 90%;
+    max-width: 500px;
+    padding: 20px 0;
+  }
+
+  /* Visualizer - tappable */
+  .visualizer-container {
+    width: 100%; height: 120px;
+    cursor: pointer;
+    border-radius: 16px;
+    transition: background 0.2s;
+    position: relative;
+  }
+  .visualizer-container:hover { background: #ffffff08; }
+  .visualizer-container:active { background: #ffffff10; }
+  .visualizer-container.recording { background: #c0392b15; }
+  canvas { width: 100%; height: 100%; display: block; }
+
+  /* Status label */
+  .status-label {
+    font-size: 13px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 2px;
+    color: #555; margin-top: -8px;
+    transition: color 0.3s;
+    min-height: 20px;
+  }
+
+  /* Transcript */
+  .transcript {
+    width: 100%; min-height: 40px;
+    text-align: center; font-size: 16px;
+    line-height: 1.5; color: #999; padding: 0 16px;
+  }
+
+  /* Text input toggle button */
+  .text-toggle {
+    width: 40px; height: 40px;
+    border-radius: 50%; border: none;
+    background: #1a1a28; color: #555;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s, color 0.2s;
+  }
+  .text-toggle:hover { background: #2a2a4a; color: #999; }
+
+  /* Text input */
+  .text-input-section {
+    width: 100%; display: none; gap: 8px;
+  }
+  .text-input-section.visible { display: flex; }
+  .text-input {
+    flex: 1; background: #111118; border: 1px solid #222;
+    border-radius: 12px; padding: 12px 16px;
+    color: #ddd; font-size: 14px; font-family: inherit;
+    outline: none; transition: border-color 0.2s;
+  }
+  .text-input:focus { border-color: #4fc3f7; }
+  .text-input::placeholder { color: #444; }
+  .send-btn {
+    background: #4fc3f7; border: none;
+    border-radius: 12px; padding: 12px 18px;
+    color: #0a0a0f; font-size: 14px; font-weight: 600;
+    cursor: pointer; font-family: inherit; transition: opacity 0.2s;
+  }
+  .send-btn:hover { opacity: 0.85; }
+
+  /* Collapsible */
+  .collapsible { width: 100%; }
+  .collapsible-header {
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; padding: 8px 0;
+  }
+  .collapsible-title {
+    font-size: 11px; text-transform: uppercase;
+    letter-spacing: 1.5px; color: #444;
+  }
+  .collapsible-arrow {
+    font-size: 10px; color: #444; transition: transform 0.2s;
+  }
+  .collapsible.open .collapsible-arrow { transform: rotate(180deg); }
+  .collapsible-body {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .collapsible.open .collapsible-body { max-height: 300px; padding-top: 8px; }
+  .option-group {
+    width: 100%; display: flex; flex-direction: column;
+    align-items: center; gap: 8px; padding-bottom: 14px;
+  }
+  .option-group:last-child { padding-bottom: 0; }
+  .option-label {
+    font-size: 11px; text-transform: uppercase;
+    letter-spacing: 1.5px; color: #444;
+  }
+
+  /* Voice grid */
+  .voice-grid { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .voice-btn {
+    background: #161622; border: 1px solid #222;
+    border-radius: 20px; padding: 8px 16px;
+    color: #888; font-size: 13px; cursor: pointer;
+    transition: all 0.2s; font-family: inherit;
+  }
+  .voice-btn:hover { border-color: #444; color: #ccc; }
+  .voice-btn.active {
+    border-color: #4fc3f7; color: #4fc3f7;
+    background: #4fc3f710; box-shadow: 0 0 8px #4fc3f720;
+  }
+
+  /* Lights */
+  .lights-row { display: flex; align-items: center; gap: 12px; }
+  .lights-toggle {
+    width: 44px; height: 24px; background: #222;
+    border-radius: 12px; position: relative; cursor: pointer;
+    transition: background 0.3s;
+  }
+  .lights-toggle.on { background: #ffb74d40; }
+  .lights-toggle .knob {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #555; position: absolute;
+    top: 3px; left: 3px; transition: all 0.3s;
+  }
+  .lights-toggle.on .knob {
+    left: 23px; background: #ffb74d; box-shadow: 0 0 8px #ffb74d60;
+  }
+
+  .footer {
+    font-size: 10px; color: #222; letter-spacing: 1px;
+    position: absolute; bottom: 16px; text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="visualizer-container" id="visualizer-container">
+    <canvas id="visualizer"></canvas>
+  </div>
+
+  <div class="status-label" id="status-label">Tap to speak</div>
+
+  <div class="transcript" id="transcript"></div>
+
+  <button class="text-toggle" id="text-toggle" title="Text input">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+      <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/>
+      <path d="M7 9h10v2H7zm0-3h10v2H7zm0 6h7v2H7z"/>
+    </svg>
+  </button>
+
+  <div class="text-input-section" id="text-input-section">
+    <input type="text" class="text-input" id="text-input" placeholder="Type a message..." autocomplete="off">
+    <button class="send-btn" id="send-btn">Send</button>
+  </div>
+
+  <div class="collapsible" id="options-section">
+    <div class="collapsible-header" onclick="toggleSection('options-section')">
+      <span class="collapsible-title">Options</span>
+      <span class="collapsible-arrow">&#9660;</span>
+    </div>
+    <div class="collapsible-body">
+      <div class="option-group">
+        <div class="option-label">Voice</div>
+        <div class="voice-grid" id="voice-grid">
+          <button class="voice-btn active" data-voice="morgan">Morgan</button>
+          <button class="voice-btn" data-voice="scarlett">Scarlett</button>
+          <button class="voice-btn" data-voice="david">David</button>
+          <button class="voice-btn" data-voice="emma">Emma</button>
+          <button class="voice-btn" data-voice="custom">+ Clone</button>
+        </div>
+      </div>
+      <div class="option-group">
+        <div class="option-label">Lights</div>
+        <div class="lights-row">
+          <div class="lights-toggle" id="lights-toggle">
+            <div class="knob"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">Local AI</div>
+
+<script>
+  // --- Collapsible ---
+  function toggleSection(id) { document.getElementById(id).classList.toggle('open'); }
+
+  // --- Visualizer ---
+  const canvas = document.getElementById('visualizer');
+  const ctx = canvas.getContext('2d');
+  const vizContainer = document.getElementById('visualizer-container');
+  const statusLabel = document.getElementById('status-label');
+  const transcriptEl = document.getElementById('transcript');
+  let dpr = window.devicePixelRatio || 1;
+  let bars = 40;
+  let barData = new Array(bars).fill(0);
+  let targetData = new Array(bars).fill(0);
+  let vizState = 'idle'; // idle | listening | thinking | speaking
+  let time = 0;
+
+  const stateColors = {
+    idle: { r: 79, g: 195, b: 247 },
+    listening: { r: 192, g: 57, b: 43 },
+    thinking: { r: 255, g: 183, b: 77 },
+    speaking: { r: 129, g: 199, b: 132 }
+  };
+
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.offsetWidth * dpr;
+    canvas.height = canvas.offsetHeight * dpr;
+    ctx.scale(dpr, dpr);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function generateTargets() {
+    for (let i = 0; i < bars; i++) {
+      const center = bars / 2;
+      const dist = Math.abs(i - center) / center;
+      if (vizState === 'idle') {
+        targetData[i] = (Math.sin(time * 0.02 + i * 0.3) * 0.15 + 0.08) * (1 - dist * 0.6);
+      } else if (vizState === 'listening') {
+        targetData[i] = (Math.sin(time * 0.06 + i * 0.4) * 0.5 + 0.3) * (1 - dist * 0.3);
+      } else if (vizState === 'thinking') {
+        targetData[i] = Math.abs(Math.sin(time * 0.05 + i * 0.2) * Math.cos(time * 0.02 + i * 0.1)) * 0.5 * (1 - dist * 0.3);
+      } else {
+        targetData[i] = Math.abs(Math.sin(time * 0.04 + i * 0.25) * 0.4 + Math.sin(time * 0.08 + i * 0.5) * 0.2) * (1 - dist * 0.4);
+      }
+    }
+  }
+
+  function draw() {
+    const w = canvas.offsetWidth, h = canvas.offsetHeight;
+    ctx.clearRect(0, 0, w, h);
+    generateTargets();
+    const barWidth = (w / bars) * 0.6, gap = (w / bars) * 0.4;
+    const c = stateColors[vizState];
+    for (let i = 0; i < bars; i++) {
+      barData[i] += (targetData[i] - barData[i]) * 0.12;
+      const bh = Math.max(2, barData[i] * h * 0.8);
+      const x = i * (barWidth + gap) + gap / 2;
+      ctx.fillStyle = `rgba(${c.r},${c.g},${c.b},${0.4 + barData[i] * 0.6})`;
+      ctx.beginPath();
+      ctx.roundRect(x, (h - bh) / 2, barWidth, bh, barWidth / 2);
+      ctx.fill();
+    }
+    time++;
+    requestAnimationFrame(draw);
+  }
+  draw();
+
+  // --- Tap visualizer to cycle states (demo only) ---
+  const demoStates = ['idle', 'listening', 'thinking', 'speaking'];
+  const demoLabels = { idle: 'Tap to speak', listening: 'Listening...', thinking: 'Thinking...', speaking: 'Speaking...' };
+  const demoTranscripts = { idle: '', listening: '', thinking: 'Processing your request...', speaking: 'The weather in Kitchener is minus two with light snow tonight.' };
+  let demoIndex = 0;
+  let thinkingTimeout = null;
+
+  let speakingTimeout = null;
+
+  function setDemoState(state) {
+    vizState = state;
+    vizContainer.className = 'visualizer-container' + (vizState === 'listening' ? ' recording' : '');
+    statusLabel.textContent = demoLabels[vizState];
+    statusLabel.style.color = { idle: '#555', listening: '#c0392b', thinking: '#ffb74d', speaking: '#81c784' }[vizState];
+    if (demoTranscripts[vizState]) transcriptEl.textContent = demoTranscripts[vizState];
+  }
+
+  vizContainer.addEventListener('click', () => {
+    if (thinkingTimeout) { clearTimeout(thinkingTimeout); thinkingTimeout = null; }
+    if (speakingTimeout) { clearTimeout(speakingTimeout); speakingTimeout = null; }
+    demoIndex = (demoIndex + 1) % demoStates.length;
+    if (demoStates[demoIndex] === 'speaking') demoIndex = (demoIndex + 1) % demoStates.length;
+    setDemoState(demoStates[demoIndex]);
+    if (vizState === 'thinking') {
+      thinkingTimeout = setTimeout(() => {
+        demoIndex = demoStates.indexOf('speaking');
+        setDemoState('speaking');
+        thinkingTimeout = null;
+        speakingTimeout = setTimeout(() => {
+          demoIndex = 0;
+          vizState = 'idle';
+          vizContainer.className = 'visualizer-container';
+          statusLabel.textContent = demoLabels['idle'];
+          statusLabel.style.color = '#555';
+          speakingTimeout = null;
+        }, 2000);
+      }, 2000);
+    }
+  });
+
+  // --- Text toggle ---
+  document.getElementById('text-toggle').addEventListener('click', () => {
+    const section = document.getElementById('text-input-section');
+    section.classList.toggle('visible');
+    if (section.classList.contains('visible')) document.getElementById('text-input').focus();
+  });
+
+  // --- Voice selector ---
+  document.getElementById('voice-grid').addEventListener('click', (e) => {
+    const btn = e.target.closest('.voice-btn');
+    if (!btn) return;
+    document.querySelectorAll('.voice-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+
+  // --- Lights toggle ---
+  document.getElementById('lights-toggle').addEventListener('click', function() {
+    this.classList.toggle('on');
+  });
+</script>
+</body>
+</html>
