@@ -68,6 +68,7 @@
     transition: background 0.2s, color 0.2s;
   }
   .text-toggle:hover { background: #2a2a4a; color: #999; }
+  .btn-row { display: flex; gap: 8px; }
 
   /* Text input */
   .text-input-section {
@@ -168,12 +169,19 @@
 
   <div class="transcript" id="transcript"></div>
 
-  <button class="text-toggle" id="text-toggle" title="Text input">
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-      <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/>
-      <path d="M7 9h10v2H7zm0-3h10v2H7zm0 6h7v2H7z"/>
-    </svg>
-  </button>
+  <div class="btn-row">
+    <button class="text-toggle" id="text-toggle" title="Text input">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/>
+        <path d="M7 9h10v2H7zm0-3h10v2H7zm0 6h7v2H7z"/>
+      </svg>
+    </button>
+    <button class="text-toggle" id="reset-btn" title="New conversation">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+        <path d="M17.65 6.35A7.96 7.96 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+      </svg>
+    </button>
+  </div>
 
   <div class="text-input-section" id="text-input-section">
     <input type="text" class="text-input" id="text-input" placeholder="Type a message..." autocomplete="off">
@@ -328,6 +336,18 @@
 
   // --- Backend ---
   const BACKEND = '';
+  const SESSION_ID = crypto.randomUUID();
+
+  // --- Reset button ---
+  document.getElementById('reset-btn').addEventListener('click', async () => {
+    await fetch(`${BACKEND}/api/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: SESSION_ID })
+    });
+    transcriptEl.textContent = '';
+    setDemoState('idle');
+  });
 
   // --- Send button ---
   function getSelectedVoice() {
@@ -353,7 +373,7 @@
         const res = await fetch(`${BACKEND}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, voice: getSelectedVoice() })
+          body: JSON.stringify({ text, voice: getSelectedVoice(), session_id: SESSION_ID })
         });
         const data = await res.json();
         setDemoState('speaking');
