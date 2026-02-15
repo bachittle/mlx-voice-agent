@@ -20,9 +20,9 @@ TTS_SERVER = 'http://localhost:8000'
 LLM_SERVER = 'http://localhost:8001'
 DEFAULT_VOICE = 'morgan-freeman'
 DEFAULT_TTS_MODEL = 'qwen3-tts'
-DEFAULT_LLM_MODEL = 'qwen3-8b'
+DEFAULT_LLM_MODEL = 'qwen3-4b'
 
-SYSTEM_PROMPT = "You are a helpful voice assistant. Keep responses short and conversational — one to three sentences max. No markdown, no lists, no formatting. Speak naturally."
+SYSTEM_PROMPT = "You are a helpful voice assistant. Keep responses to ONE short sentence, max 15 words. No markdown, no lists, no formatting. Be warm and natural."
 
 # Conversation history per session
 conversations = {}
@@ -104,6 +104,31 @@ def reset():
     session_id = data.get('session_id', 'default')
     conversations.pop(session_id, None)
     return jsonify({'status': 'ok'})
+
+
+# Pending messages queue (for external control, e.g. from residence)
+pending_messages = []
+
+
+@app.route('/api/queue', methods=['POST'])
+def queue_message():
+    """Queue a message to be picked up by the frontend."""
+    data = request.get_json()
+    text = data.get('text', '')
+    voice = data.get('voice', DEFAULT_VOICE)
+    session_id = data.get('session_id', 'default')
+    if text:
+        pending_messages.append({'text': text, 'voice': voice, 'session_id': session_id})
+    return jsonify({'status': 'queued', 'pending': len(pending_messages)})
+
+
+@app.route('/api/queue', methods=['GET'])
+def get_queue():
+    """Pop the next pending message for the frontend to process."""
+    if pending_messages:
+        msg = pending_messages.pop(0)
+        return jsonify(msg)
+    return jsonify(None)
 
 
 @app.route('/api/voices', methods=['GET'])
